@@ -1,10 +1,5 @@
 #!/bin/bash
 
-# Исходные данные
-email="v320@mail.ru"
-server_name="a.trittium.cc"
-coin="trittium"
-
 output() {
   printf "\E[0;33;40m"
   echo $1
@@ -12,6 +7,19 @@ output() {
 }
 
 clear
+
+# Исходные данные
+time="Europe/Moscow"
+email="v320@mail.ru"
+server_name="a.trittium.cc"
+
+output "Make sure you double check before hitting enter! Only one shot at these!"
+#read -e -p "Enter time zone (e.g. America/New_York) : " time
+#read -e -p "Server name (no http:// or www. just example.com) : " server_name
+#read -e -p "Enter support email (e.g. admin@example.com) : " email
+output "==================================================="
+output ""
+output ""
 
 output "Updating system and installing required packages."
 #apt-get -y update
@@ -83,17 +91,17 @@ server {
   location = /favicon.ico { access_log off; log_not_found off; }
   location = /robots.txt  { access_log off; log_not_found off; }
   location /myadmin {
-    root /usr/share/;
+    alias /usr/share/phpmyadmin;
     index index.php;
-    try_files $uri $uri/ =404;
-    location ~ ^/myadmin/(doc|sql|setup)/ {
-      deny all;
-    }
-    location ~ /myadmin/(.+\.php)$ {
+    location ~ ^/myadmin/(.+.php)$ {
+      alias /usr/share/phpmyadmin/$1;
       fastcgi_pass unix:/run/php/php7.0-fpm.sock;
-      fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
       include fastcgi_params;
-      include snippets/fastcgi-php.conf;
+      fastcgi_index index.php;
+      fastcgi_param SCRIPT_FILENAME /usr/share/phpmyadmin/$1;
+    }
+    location ~* ^/myadmin/(.+.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))$ {
+      alias /usr/share/phpmyadmin/$1;
     }
   }
   location ~ \.php$ {
@@ -124,7 +132,7 @@ server {
 ' | tee /etc/nginx/sites-available/$server_name.conf >/dev/null 2>&1
 #ln -s /etc/nginx/sites-available/$server_name.conf /etc/nginx/sites-enabled/$server_name.conf
 #mkdir "/var/www/${server_name}"
-echo '<h1>You see index.php</h1>' > "/var/www/${server_name}/index.php"
+echo '<h1>You see test_index.php</h1>' > "/var/www/${server_name}/test_index.php"
 chown -R www-data:www-data "/var/www/${server_name}"
 output "Create browser url: http://${server_name} for test"
 service nginx restart
@@ -136,7 +144,7 @@ output "Install LetsEncrypt"
 #apt-get -y install letsencrypt
 #wget https://dl.eff.org/certbot-auto && chmod a+x certbot-auto
 #mv certbot-auto /etc/letsencrypt/
-output "Задание на обновление сертификата"
+output "Certificat renew cron"
 #crontab -l | { cat; echo "#45 5 * * 6 cd /etc/letsencrypt/ && ./certbot-auto renew && /etc/init.d/nginx restart"; } | crontab -
 output "==================================================="
 output ""
@@ -146,8 +154,8 @@ output "Install certificat"
 #letsencrypt certonly -a webroot --webroot-path="/var/www/${server_name}" --email "$email" --agree-tos -d "$server_name"
 #openssl dhparam -out /etc/ssl/certs/dhparam.pem 2048
 
-#sed -i 's/listen 80;/listen 443 ssl http2;/' /etc/nginx/sites-available/$server_name.conf
-#sed -i 's/listen \[::\]:80;/listen [::]:443 ssl http2;/' /etc/nginx/sites-available/$server_name.conf
+sed -i 's/listen 80;/listen 443 ssl http2;/' /etc/nginx/sites-available/$server_name.conf
+sed -i 's/listen \[::\]:80;/listen [::]:443 ssl http2;/' /etc/nginx/sites-available/$server_name.conf
 SERVER=`echo 'server {\n\
   listen 80;\n\
   listen [::]:80;\n\
@@ -157,7 +165,7 @@ SERVER=`echo 'server {\n\
 \n\
 server {
 '`
-#sed -i "s/server {/$SERVER/" /etc/nginx/sites-available/$server_name.conf
+sed -i "s/server {/$SERVER/" /etc/nginx/sites-available/$server_name.conf
 SSL=`echo "# strengthen ssl security\n\
   ssl_certificate \/etc\/letsencrypt\/live\/${server_name}\/fullchain.pem;\n\
   ssl_certificate_key \/etc\/letsencrypt\/live\/${server_name}\/privkey.pem;\n\
@@ -167,7 +175,7 @@ SSL=`echo "# strengthen ssl security\n\
   ssl_ciphers \"EECDH+AESGCM:EDH+AESGCM:ECDHE-RSA-AES128-GCM-SHA256:AES256+EECDH:DHE-RSA-AES128-GCM-SHA256:AES256+EDH:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA:ECDHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES256-GCM-SHA384:AES128-GCM-SHA256:AES256-SHA256:AES128-SHA256:AES256-SHA:AES128-SHA:DES-CBC3-SHA:HIGH:!aNULL:!eNULL:!EXPORT:!DES:!MD5:!PSK:!RC4\";\n\
   ssl_dhparam \/etc\/ssl\/certs\/dhparam\.pem;
 "`
-#sed -i "s/# strengthen ssl security/$SSL/" /etc/nginx/sites-available/$server_name.conf
+sed -i "s/# strengthen ssl security/$SSL/" /etc/nginx/sites-available/$server_name.conf
 service nginx restart
 output "Create browser url: http://${server_name} for test. You need redirect to https."
 output "==================================================="
@@ -179,3 +187,16 @@ output "Install phpMyAdmin"
 output "==================================================="
 output ""
 output ""
+
+output "Update default timezone."
+# check if link file
+[ -L /etc/localtime ] &&  unlink /etc/localtime
+# update time zone
+ln -sf /usr/share/zoneinfo/$time /etc/localtime
+aptitude -y install ntpdate
+# write time to clock.
+hwclock -w
+output "==================================================="
+output ""
+output ""
+output "END"
